@@ -107,6 +107,7 @@ def clean_photo_image(path, out_dir):
   # save to folder
   name = os.path.basename(path)
   out_file = os.path.join(out_dir, name)
+  print ("Writing the image to the folder")
   cv2.imwrite(out_file, gray)
 
 
@@ -115,7 +116,9 @@ if __name__ == "__main__":
   from os.path import join
   from pathlib import Path
 
-  root = join(Path(__file__).resolve().parent, 'images/integration')
+  # KK: Note this had false assumptions about filestructure;
+  # We need to append an additional `.parent` to get to testing_project/ instead of testing_project/scripts
+  root = join(Path(__file__).resolve().parent.parent, 'images/integration')
   raw_dir = 'digits-raw'
   out_dir = 'digits-processed'
 
