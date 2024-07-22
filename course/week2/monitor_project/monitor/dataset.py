@@ -7,6 +7,9 @@ from collections import defaultdict
 
 from .paths import DATA_DIR
 
+import pdb
+import re
+from transformers import RobertaTokenizer
 
 class ProductReviewEmbeddings(Dataset):
   r"""RoBERTa embeddings of customer reviews. Embeddings are precomputed 
@@ -31,7 +34,6 @@ class ProductReviewEmbeddings(Dataset):
     self.lang = lang
 
   def get_vocab(self):
-    vocab = defaultdict(lambda: 0)
     # ===============================
     # FILL ME OUT
     # 
@@ -51,8 +53,16 @@ class ProductReviewEmbeddings(Dataset):
     # Notes:
     # --
     # Convert tokens to lowercase when updating vocab.
-    pass  # remove me
     # ===============================
+    vocab = defaultdict(lambda: 0)
+    # pattern = re.compile(r'[\W]+')
+    tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+    for review in self.data.review:
+      # tokens = pattern.split(review.lower())
+      tokens = tokenizer.tokenize(review.lower())
+      for token in tokens:
+        vocab[token] += 1
+
     return dict(vocab)
 
   def get_labels(self):
@@ -94,8 +104,6 @@ class ProductReviewStream(Dataset):
     self.embedding = torch.load(join(DATA_DIR, 'stream', f'stream{index}.pt'))
 
   def get_vocab(self):
-    # `defaultdict` can be a helpful utility
-    vocab = defaultdict(lambda: 0)
     # ===============================
     # FILL ME OUT
     # 
@@ -111,8 +119,19 @@ class ProductReviewStream(Dataset):
     # Type:
     # --
     # vocab: dict[str, int]
-    pass  # remove me
     # ===============================
+    # `defaultdict` can be a helpful utility
+    vocab = defaultdict(lambda: 0)
+
+    # todo: DRY up this method and cache the loading of the RobertaTokenizer
+    tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+    
+    for review in self.data.review:
+      tokens = tokenizer.tokenize(review.lower())
+      # tokens = re.split('\W+', review)
+      for token in tokens:
+        vocab[token] += 1
+
     return dict(vocab)
 
   def __getitem__(self, index):

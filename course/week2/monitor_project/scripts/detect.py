@@ -27,7 +27,8 @@ def main(args):
   # initialize the `MonitoringSystem` using the vocabulary
   # and predicted probabilities.
   monitor = MonitoringSystem(tr_vocab, tr_probs, tr_labels)
-
+  
+  all_stream_results = [[], [], []]
   for index in range(1, 9):
     te_ds = ProductReviewStream(index)
     te_dl = DataLoader(te_ds, batch_size=128, shuffle=False, num_workers=4)
@@ -54,7 +55,15 @@ def main(args):
       print(f'Histogram intersection: {results["hist_score"]:.3f}')
       print(f'OOD Vocab %: {results["outlier_score"]*100:.2f}')
       print('')  # new line
+      all_stream_results[0].append(results["ks_score"])
+      all_stream_results[1].append(results["hist_score"])
+      all_stream_results[2].append(results["outlier_score"]*100)
 
+  print('\n==========================')
+  print('\Final Results')
+  print(all_stream_results[0])
+  print(all_stream_results[1])
+  print(all_stream_results[2])
 
 def get_probs(system, loader):
   trainer = Trainer(logger = TensorBoardLogger(save_dir=LOG_DIR))
