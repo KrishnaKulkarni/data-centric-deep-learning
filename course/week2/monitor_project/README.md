@@ -17,3 +17,8 @@ Then, run the following:
 gdown --id 1hdwWYFNJiCI_zFHWTMce6TETyj20GHG9
 ```
 This will download a 3gb file of precomputed text embeddings to a file `data.zip`. Unzip the file and replace `monitor_project/data` with the unzipped folder. 
+
+## Monitoring Project: Accuracy Results
+                    English     Spanish
+Baseline Model  :   88.5%       54.7%
+Retrained Model :   88.0%       72.3%
