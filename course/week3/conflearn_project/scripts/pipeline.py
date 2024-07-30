@@ -92,14 +92,16 @@ class TrainIdentifyReview(FlowSpec):
     # results are saved into the system
     results = system.test_results
 
-    # print results to command line
-    pprint(results)
-
-    log_file = join(LOG_DIR, 'baseline.json')
-    os.makedirs(LOG_DIR, exist_ok = True)
-    to_json(results, log_file)  # save to disk
+    self._print_and_log_results(results= results, log_filename= 'baseline.json')
 
     self.next(self.crossval)
+
+  def _print_and_log_results(self, results, log_filename):
+    pprint(results)
+
+    log_file = join(LOG_DIR, log_filename)
+    os.makedirs(LOG_DIR, exist_ok = True)
+    to_json(results, log_file)  # save to disk
   
   @step
   def crossval(self):
@@ -126,54 +128,31 @@ class TrainIdentifyReview(FlowSpec):
     kf = KFold(n_splits=3)    # create kfold splits
 
     for train_index, test_index in kf.split(X):
-      probs_ = None
       # ===============================================
-      # FILL ME OUT
-      # 
-      # Fit a new `SentimentClassifierSystem` on the split of 
-      # `X` and `y` defined by the current `train_index` and
-      # `test_index`. Then, compute predicted probabilities on 
-      # the test set. Store these probabilities as a 1-D numpy
-      # array `probs_`.
-      # 
-      # Use `self.config.train.optimizer` to specify any hparams 
-      # like `batch_size` or `epochs`.
-      #  
-      # HINT: `X` and `y` are currently numpy objects. You will 
-      # need to convert them to torch tensors prior to training. 
-      # You may find the `TensorDataset` class useful. Remember 
-      # that `Trainer.fit` and `Trainer.predict` take `DataLoaders`
-      # as an input argument.
-      # 
-      # Our solution is ~15 lines of code.
-      # 
-      # Pseudocode:
-      # --
-      # Get train and test slices of X and y.
-      # Convert to torch tensors.
-      # Create train/test datasets using tensors.
-      # Create train/test data loaders from datasets.
-      # Create `SentimentClassifierSystem`.
-      # Create `Trainer` and call `fit`.
-      # Call `predict` on `Trainer` and the test data loader.
-      # Convert probabilities back to numpy (make sure 1D).
-      # 
       # Types:
       # --
-      # probs_: np.array[float] (shape: |test set|)
-      # TODO
+      # predicted_probs: np.array[float] (shape: |test set|)
       # ===============================================
-      assert probs_ is not None, "`probs_` is not defined."
-      probs[test_index] = probs_
+      train_dataloader, test_dataloader = self._create_train_n_test_data_loaders(
+        train_index, test_index, X, y
+      )
+      system = SentimentClassifierSystem(self.config)
+      current_fold_probs = self._train_model_and_make_predictions(
+        system, train_dataloader, test_dataloader
+      )
+      probs[test_index] = current_fold_probs
 
+    # Q: Why isn't the following code redundant with the concatenation that happens at the top of the method?
     # create a single dataframe with all input features
     all_df = pd.concat([
       dm.train_dataset.data,
       dm.dev_dataset.data,
       dm.test_dataset.data,
     ])
+     # Q: What is `reset_index(drop=True)` doing?
     all_df = all_df.reset_index(drop=True)
     # add out-of-sample probabilities to the dataframe
+    # Q: How are we ensuring that the probabilities are corrected mapped to their corresponding input?
     all_df['prob'] = probs
 
     # save to excel file
@@ -181,6 +160,48 @@ class TrainIdentifyReview(FlowSpec):
 
     self.all_df = all_df
     self.next(self.inspect)
+
+  def _create_train_n_test_data_loaders(self, train_index, test_index, X, y):
+      train_index, test_index = np.array(train_index), np.array(test_index)
+
+      # Create tensor slices
+      X_train, X_test = torch.from_numpy(X[train_index]), torch.from_numpy(X[test_index])
+      y_train, y_test = torch.from_numpy(y[train_index]), torch.from_numpy(y[test_index])
+      # Q: Why did Amy's example append .float() / .long() ?
+
+      # Create train/test datasets using tensors.
+      # Q: What is the TensorDataset API? Why do we need to instantiate a new object vs. just using the numpy arrays?
+      # Q: Why does this not resemble the training code of #train_test?
+      train_dataset = TensorDataset(X_train, y_train)
+      test_dataset = TensorDataset(X_test, y_test)
+
+      # Create train/test data loaders from datasets.
+      # Q: Why does this not resemble the training code of #train_test?
+      # Q: Why is self.config available in this step, given we DID NOT store it in the immediately prior step?
+      # Q: Do we NEED to shuffle the data in the Dataloader? Why or why not? What is the effect of doing so?
+      train_dataloader = DataLoader(
+        train_dataset,
+        batch_size = self.config.train.optimizer.batch_size,
+        shuffle = True
+      )
+      test_dataloader = DataLoader(
+        test_dataset,
+        batch_size = self.config.train.optimizer.batch_size
+      )
+
+      return train_dataloader, test_dataloader
+  
+  def _train_model_and_make_predictions(self, system, train_dataloader, test_dataloader):
+      # Create `Trainer` and call `fit`.
+      # Q: Why don't we need a checkpoint callback?
+      trainer = Trainer(max_epochs = self.config.train.optimizer.max_epochs) 
+      trainer.fit(system, train_dataloader)
+      # Call `predict` on `Trainer` and the test data loader.
+      predicted_probs = trainer.predict(system, dataloaders = test_dataloader)
+      # Q: What exactly is each method invocation doing in this line?
+      predicted_probs = torch.cat(predicted_probs).squeeze(1).numpy()
+
+      return predicted_probs
 
   @step
   def inspect(self):
@@ -206,14 +227,21 @@ class TrainIdentifyReview(FlowSpec):
     # Types
     # --
     # ranked_label_issues: List[int]
-    # TODO
     # =============================
+    # Q: How would we know that the y-values were stored in all_df.label as opposed to some other key?
+    ranked_label_issues = find_label_issues(
+      labels=np.asarray(self.all_df.label),
+      pred_probs=prob,
+      return_indices_ranked_by="self_confidence"
+    )
+
     assert ranked_label_issues is not None, "`ranked_label_issues` not defined."
 
     # save this to class
     self.issues = ranked_label_issues
     print(f'{len(ranked_label_issues)} label issues found.')
 
+    # Q: Shouldn't we be doing this in the .retrain_retest step, instead of here?
     # overwrite label for all the entries in all_df
     for index in self.issues:
       label = self.all_df.loc[index, 'label']
@@ -287,40 +315,37 @@ class TrainIdentifyReview(FlowSpec):
   def retrain_retest(self):
     r"""Retrain without reviewing. Let's assume all the labels that 
     confidence learning suggested to flip are indeed erroneous."""
-    dm = ReviewDataModule(self.config)
-    train_size = len(dm.train_dataset)
-    dev_size = len(dm.dev_dataset)
 
-    # ====================================
-    # FILL ME OUT
-    # 
-    # Overwrite the dataframe in each dataset with `all_df`. Make sure to 
-    # select the right indices. Since `all_df` contains the corrected labels,
-    # training on it will incorporate cleanlab's re-annotations.
-    # 
-    # Pseudocode:
-    # --
-    # dm.train_dataset.data = training slice of self.all_df
-    # dm.dev_dataset.data = dev slice of self.all_df
-    # dm.test_dataset.data = test slice of self.all_df
-    # TODO
     # # ====================================
-
+    # Q: I understand why we're revising the training data. But why are we revising the test data?
+    revised_data_module = self._reannotate_unconfident_labels(
+      data_module = ReviewDataModule(self.config),
+      reannotated_dataframe = self.all_df
+    )
     # start from scratch
     system = SentimentClassifierSystem(self.config)
     trainer = Trainer(max_epochs = self.config.train.optimizer.max_epochs)
 
-    trainer.fit(system, dm)
-    trainer.test(system, dm, ckpt_path = 'best')
+    trainer.fit(system, revised_data_module)
+    trainer.test(system, revised_data_module, ckpt_path = 'best')
     results = system.test_results
 
-    pprint(results)
-
-    log_file = join(LOG_DIR, 'conflearn.json')
-    os.makedirs(LOG_DIR, exist_ok = True)
-    to_json(results, log_file)  # save to disk
+    self._print_and_log_results(results= results, log_filename= 'conflearn.json')
 
     self.next(self.end)
+
+  def _reannotate_unconfident_labels(self, data_module, reannotated_dataframe):
+    # We assume that we concatenated data in the strict order: training, then dev, then test
+    # This assumption is met in the .crossval step
+    train_size = len(data_module.train_dataset)
+    dev_size = len(data_module.dev_dataset)
+
+    # Q: Why do we need to write the dataframe's changes into the datamodule; why can't we just use the dataframe directly for our retraining?
+    data_module.train_dataset.data = reannotated_dataframe.iloc[0:train_size]
+    data_module.dev_dataset.data = reannotated_dataframe.iloc[train_size:(train_size + dev_size)]
+    data_module.test_dataset.data = reannotated_dataframe.iloc[(train_size + dev_size):]
+
+    return data_module
 
   @step
   def end(self):
