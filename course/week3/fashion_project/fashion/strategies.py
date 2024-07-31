@@ -5,6 +5,10 @@ from typing import List
 from .utils import fix_random_seed
 from sklearn.cluster import KMeans
 
+import random
+
+import pdb
+  
 def random_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   '''Randomly pick examples.
   :param pred_probs: list of predicted probabilities for the production set in order.
@@ -13,7 +17,6 @@ def random_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   '''
   fix_random_seed(42)
   
-  indices = []
   # ================================
   # FILL ME OUT
   # Randomly pick a 1000 examples to label. This serves as a baseline.
@@ -21,6 +24,18 @@ def random_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   # HINT: when you randomly sample, do not choose duplicates.
   # HINT: please ensure indices is a list of integers
   # ================================
+  # KK: Old implementation
+  # while(len(indices) < budget):
+  #   random_index = random.randrange(len(pred_probs))
+  #   if random_index in indices:
+  #     next
+  #   else:
+  #     indices.append(random_index)
+
+  indices = list(range(len(pred_probs)))
+  random.shuffle(indices)
+  indices = indices[:budget]
+
   return indices
 
 def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
@@ -29,8 +44,7 @@ def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[
   :param budget: the number of examples you are allowed to pick for labeling.
   :return indices: A list of indices (into the `pred_probs`) for examples to label.
   '''
-  indices = []
-  chance_prob = 1 / 10.  # may be useful
+
   # ================================
   # FILL ME OUT
   # Sort indices by the predicted probabilities and choose the 1000 examples with 
@@ -39,6 +53,13 @@ def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[
   # Take the first 1000.
   # HINT: please ensure indices is a list of integers
   # ================================
+   # compute logs of probs
+   # compute log difference: chance_prob - prob[i]
+   # sort by log differences, lowest first
+   # take first 1000
+  indices = []
+  chance_prob = 1 / 10.  # may be useful
+
   return indices
 
 def margin_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
