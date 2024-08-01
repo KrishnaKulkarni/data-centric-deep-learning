@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 import random
 
 import pdb
-  
+
 def random_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   '''Randomly pick examples.
   :param pred_probs: list of predicted probabilities for the production set in order.
@@ -18,19 +18,6 @@ def random_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   fix_random_seed(42)
   
   # ================================
-  # FILL ME OUT
-  # Randomly pick a 1000 examples to label. This serves as a baseline.
-  # Note that we fixed the random seed above. Please do not edit.
-  # HINT: when you randomly sample, do not choose duplicates.
-  # HINT: please ensure indices is a list of integers
-  # ================================
-  # KK: Old implementation
-  # while(len(indices) < budget):
-  #   random_index = random.randrange(len(pred_probs))
-  #   if random_index in indices:
-  #     next
-  #   else:
-  #     indices.append(random_index)
 
   indices = list(range(len(pred_probs)))
   random.shuffle(indices)
@@ -45,20 +32,28 @@ def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[
   :return indices: A list of indices (into the `pred_probs`) for examples to label.
   '''
 
-  # ================================
-  # FILL ME OUT
-  # Sort indices by the predicted probabilities and choose the 1000 examples with 
-  # the least confident predictions. Think carefully about what "least confident" means 
-  # for a N-way classification problem.
-  # Take the first 1000.
-  # HINT: please ensure indices is a list of integers
-  # ================================
-   # compute logs of probs
-   # compute log difference: chance_prob - prob[i]
-   # sort by log differences, lowest first
-   # take first 1000
-  indices = []
-  chance_prob = 1 / 10.  # may be useful
+  # ===============================
+  
+  # Approach 1
+  # build a heap of probs
+  # for each row: 
+    # find its max probability prediction
+    # if the len(heap) is < budget
+    #.   insert [index, max_pred_prob] to heap
+    # else if that max_pred_prob is too low (lower than the highest value of our heap)
+      # pop from heap (to make space)
+      # insert [index, max_pred_prob] to heap
+  
+    # returns the heap, mapped to its elements' indices (perhaps in order)
+
+  # Approach 2
+  # map pred_probs to a list of (index, max_pred_prob) pairs
+  # sort the list by max_pred_prob ascending
+  # take first B (e.g. first 1000)
+  # map those to their indices
+  max_probs, _ = torch.max(pred_probs, dim=1)
+  _, sorted_indices = torch.sort(max_probs, descending=False)
+  indices = sorted_indices[:budget].tolist()
 
   return indices
 
