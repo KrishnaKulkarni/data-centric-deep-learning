@@ -33,7 +33,10 @@ def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[
   '''
 
   # ===============================
-  
+  # NOTE: I misunderstood the definition of uncertainty sampling:
+  # It does not mean: choose examples where the model is least sure that its chosen class / top class is correct
+  # It instead means: choose examples where the model is model would be most uncertain of choice, regardless of whether it
+  # chose the top class or any of the other classes (i.e. model is maximally ambivalent among across all of its options)
   # Approach 1
   # build a heap of probs
   # for each row: 
@@ -43,7 +46,6 @@ def uncertainty_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[
     # else if that max_pred_prob is too low (lower than the highest value of our heap)
       # pop from heap (to make space)
       # insert [index, max_pred_prob] to heap
-  
     # returns the heap, mapped to its elements' indices (perhaps in order)
 
   # Approach 2
@@ -62,13 +64,21 @@ def margin_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
   :param pred_probs: list of predicted probabilities for the production set in order.
   :param budget: the number of examples you are allowed to pick for labeling.
   :return indices: A list of indices (into the `pred_probs`) for examples to label.
-  '''
-  indices = []
+  '''  
   # ================================
-  # FILL ME OUT
-  # Sort indices by the different in predicted probabilities in the top two classes per example.
-  # Take the first 1000.
-  # ================================
+
+  # Find the top two predicted probabilities for each example
+  top2_probs, _ = torch.topk(pred_probs, 2, dim=1)
+
+  # Calculate the margin (difference between the top two probabilities)
+  margins = top2_probs[:, 0] - top2_probs[:, 1]
+
+  # Get the indices of the examples with the smallest margins
+  _, sorted_indices = torch.sort(margins)
+
+  # Select the first 'budget' number of indices
+  indices = sorted_indices[:budget].tolist()
+
   return indices
 
 def entropy_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]:
