@@ -1,6 +1,8 @@
 import unittest
 import torch
-from fashion.strategies import random_sampling, uncertainty_sampling, margin_sampling
+from fashion.strategies import(
+    random_sampling, uncertainty_sampling, margin_sampling, entropy_sampling
+)
 
 class TestRandomSampling(unittest.TestCase):
     def setUp(self):
@@ -119,6 +121,45 @@ class TestMarginSampling(unittest.TestCase):
 
         actual_indices = margin_sampling(pred_probs, budget)
         expected_indices = [3, 2]
+        
+        self.assertEqual(actual_indices, expected_indices, "The sample case output indices are incorrect")
+
+class TestEntropySampling(unittest.TestCase):
+    def setUp(self):
+        # Setting up a fixed random seed for reproducibility
+        self.seed = 42
+        torch.manual_seed(self.seed)
+        
+        # Generate a tensor of predicted probabilities for a 10-class classification problem
+        self.pred_probs = torch.rand((5000, 10))  # Example tensor with 5000 samples and 10 classes
+
+    def test_output_length(self):
+        budget = 1000
+        indices = entropy_sampling(self.pred_probs, budget)
+        self.assertEqual(len(indices), budget, "The length of the output should be equal to the budget.")
+
+    def test_output_unique(self):
+        budget = 1000
+        indices = entropy_sampling(self.pred_probs, budget)
+        self.assertEqual(len(indices), len(set(indices)), "The output indices should be unique.")
+
+    def test_output_range(self):
+        budget = 1000
+        indices = entropy_sampling(self.pred_probs, budget)
+        self.assertTrue(all(0 <= idx < len(self.pred_probs) for idx in indices), "Indices should be within the valid range.")
+    
+    def test_sample_case(self):
+        pred_probs = torch.Tensor([
+            [0.3, 0, 0.05, 0.15, 0.02, 0.18, 0.05, 0.01, 0.09, 0.15], # H(X) = 2.712
+            [0.1, 0.05, 0.1, 0.15, 0.2, 0.05, 0.05, 0.1, 0.15, 0.05], # H(X) = 3.146
+            [0.13, 0.09, 0.1, 0.15, 0.14, 0.08, 0.04, 0.13, 0.1, 0.04],# H(X) = 3.213
+            [0.05, 0.1, 0.2, 0.05, 0.1, 0.05, 0.2, 0.05, 0.1, 0.1],   # H(X) = 3.122
+            [0.09, 0.11, 0.13, 0.07, 0.16, 0.09, 0.1, 0.1, 0.05, 0.1] # H(X) = 3.262
+        ])
+        budget = 2
+
+        actual_indices = entropy_sampling(pred_probs, budget)
+        expected_indices = [4, 2]
         
         self.assertEqual(actual_indices, expected_indices, "The sample case output indices are incorrect")
 
