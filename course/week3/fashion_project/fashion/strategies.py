@@ -84,26 +84,10 @@ def entropy_sampling(pred_probs: torch.Tensor, budget : int = 1000) -> List[int]
   :return indices: A list of indices (into the `pred_probs`) for examples to label.
   '''
   # ================================
-
-  entropies = [_sum_entropy(example) for example in pred_probs]
-  sorted_indices = np.flip(np.argsort(entropies))
-
+  epsilon = 1e-10  # Small constant to avoid log(0)
+  entropy = -torch.sum(pred_probs * torch.log(pred_probs + epsilon), dim=1)  
+  _, sorted_indices = torch.sort(entropy, descending=True)
+    
   indices = sorted_indices[:budget].tolist()
   
   return indices
-
-def _sum_entropy(probs):
-  sum = 0
-  for p in probs:
-    sum += _ith_entropy(p)
-
-  return sum
-
-def _ith_entropy(p):
-  if p == 0:
-    return 0
-  else:
-    return -1 * (p * np.log2(p))
-
-
-  
