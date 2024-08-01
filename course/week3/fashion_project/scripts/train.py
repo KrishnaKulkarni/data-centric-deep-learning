@@ -15,6 +15,8 @@ from fashion.system import FashionDataModule, FashionClassifierSystem
 from fashion.utils import load_config, to_json
 from fashion.paths import LOG_DIR, CONFIG_DIR
 
+from fashion.custom_transforms import AddGaussianNoise
+
 
 class TrainFlow(FlowSpec):
   r"""A MetaFlow that trains a image classifier to recognize images of fashion clothing,
@@ -27,6 +29,7 @@ class TrainFlow(FlowSpec):
   """
   config_path = Parameter('config', help = 'path to config file', default = join(CONFIG_DIR, 'train.json'))
   augment = Parameter('augment', help = 'augment training data', default = False)
+  complex_transforms = Parameter('complex-transforms', help = 'augment training data with many complex transforms', default = False)
 
   @step
   def start(self):
@@ -48,16 +51,21 @@ class TrainFlow(FlowSpec):
     config = load_config(self.config_path)
     
     if self.augment:
-      transform = transforms.Compose([
-        # ================================
-        # FILL ME OUT
-        # Any augmentations to apply to the training dataset with the goal of 
-        # enlarging the effective dataset size via "self supervision": an augmented
-        # data point maintains the same label.
-        # TODO
-        # ================================
-        transforms.ToTensor(),
-      ])
+      if self.complex_transforms:
+        transform = transforms.Compose([
+          transforms.RandomRotation(90),
+          transforms.ToTensor(),
+        ])
+      else:
+        transform = transforms.Compose([
+          # See examples here: https://pytorch.org/vision/main/auto_examples/transforms/plot_transforms_illustrations.html#sphx-glr-auto-examples-transforms-plot-transforms-illustrations-py
+          transforms.RandomRotation(90),
+          transforms.RandomResizedCrop(28),  # Random crop (FashionMNIST images are 28x28)
+          transforms.RandomHorizontalFlip(p=0.5),  # Random horizontal flip with 50% probability
+          transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),  # Color jitter
+          AddGaussianNoise(mean=0.0, std=0.1),  # Add Gaussian noise to simulate graininess
+          transforms.ToTensor(),
+        ])
     else:
       transform = transforms.ToTensor()
 
@@ -107,7 +115,7 @@ class TrainFlow(FlowSpec):
 
     # Load the best checkpoint and compute results using `self.trainer.test`
     self.trainer.test(system, dm, ckpt_path = 'best')
-    results = self.system.test_results
+    results = system.test_results
 
     # print results to command line
     pprint(results)
