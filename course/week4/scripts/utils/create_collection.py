@@ -5,6 +5,13 @@ from rag.llm import embedding_name_to_dim
 from rag.utils import to_json
 from rag.paths import DATA_DIR
 
+# Note: using Python 3.8 causes errors due to the use of '|' in the installed Python library
+# To repair this, I had to modify each of:
+# /home/vscode/.local/lib/python3.8/site-packages/starpoint/
+#   ../db.py
+#   ../writer.py
+#   ../reader.py
+#   ../_utils.py
 
 def main(args):
   r"""Create a Starpoint collection. 

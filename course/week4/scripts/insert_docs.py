@@ -30,26 +30,8 @@ def main(args):
 
   documents = []
   for i in tqdm(range(len(raw)), desc='Inserting into db'):
-    doc = ""
     # ===========================
-    # FILL ME OUT
-    # Prepare the documents to be inserted into the vector db
-    # You will need compute embeddings. Make sure to cast the embedding to a list.
-    # Please refer to `config.json` for which embedding to use:
-    # Example document:
-    # {
-    #   "embeddings": {
-    #     "values": [0.1, 0.2, 0.3, 0.4, 0.5],
-    #     "dimensionality": 5,
-    #   }, # single vector document
-    #   "metadata": {
-    #     "doc_id": "...",
-    #   }
-    # }
-    # Please add the document ID to the metadata under the key `doc_id`.
-    # Please see docs here: https://docs.starpoint.ai/create-documents 
-    # TODO
-    # ===========================
+    doc = generate_doc(raw, i, embedding_model, embedding_dim)
     assert len(doc) > 0, f"Did you complete the code in `insert_docs.py`?"
     documents.append(doc)
 
@@ -58,6 +40,23 @@ def main(args):
   print(f'Inserting documents into Starpoint collection {collection_name}')
   insert_documents(args.starpoint_api_key, collection_name, documents)
   print(f'Done. {len(documents)} inserted.')
+
+def generate_doc(dataframe, i, embedding_model, embedding_dim):
+  doc_id = dataframe['text'][i]
+  text = dataframe['doc_id'][i]
+  embedding_values = embedding_model.encode(text).tolist()
+
+  doc = {
+    "embeddings": {
+      "values": embedding_values,
+      "dimensionality": embedding_dim,
+    },
+    "metadata": {
+      "doc_id": doc_id,
+    }
+  }
+
+  return doc
 
 
 if __name__ == "__main__":
