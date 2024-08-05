@@ -5,7 +5,6 @@ from rag.llm import query_openai, get_welcome_message
 from rag.prompts import get_persona, get_retrieval_prompt, get_hyde_response_prompt
 from rag.vector import get_my_collection_name, retrieve_documents
 
-
 def main(args):
   r"""Initialize a RAG agent and have a conversation with it. 
   """
@@ -34,7 +33,10 @@ def main(args):
       top_k=3,
       text_search_weight=args.text_search_weight,
     )
-    docs = [result['metadata']['text'] for result in results]
+
+    # KK Note: The API has changed; the doc_id key is returned in place of text; this is probably a bug
+    # due to a recent change in the starpoint api
+    docs = [result['metadata']['doc_id'] for result in results]
     response = query_openai(
       args.openai_api_key, 
       user_prompt=get_retrieval_prompt(query, docs), 
