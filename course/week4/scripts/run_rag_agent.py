@@ -34,9 +34,7 @@ def main(args):
       text_search_weight=args.text_search_weight,
     )
 
-    # KK Note: The API has changed; the doc_id key is returned in place of text; this is probably a bug
-    # due to a recent change in the starpoint api
-    docs = [result['metadata']['doc_id'] for result in results]
+    docs = [result['metadata']['text'] for result in results]
     response = query_openai(
       args.openai_api_key, 
       user_prompt=get_retrieval_prompt(query, docs), 

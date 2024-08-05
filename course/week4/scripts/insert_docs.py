@@ -42,8 +42,8 @@ def main(args):
   print(f'Done. {len(documents)} inserted.')
 
 def generate_doc(dataframe, i, embedding_model, embedding_dim):
-  doc_id = dataframe['text'][i]
-  text = dataframe['doc_id'][i]
+  text = dataframe['text'][i]
+  doc_id = dataframe['doc_id'][i]
   embedding_values = embedding_model.encode(text).tolist()
 
   doc = {
@@ -53,6 +53,7 @@ def generate_doc(dataframe, i, embedding_model, embedding_dim):
     },
     "metadata": {
       "doc_id": doc_id,
+      "text": text,
     }
   }
 

@@ -21,3 +21,10 @@ There is code for you to complete in the following files
 - `scripts/optimizer_params.py`
 
 We recommend you to follow the instructions on Uplimit closely.
+
+
+### Hyperparameter Results
+
+Best results achieved by:
+The embedding model "thenlper/gte-small"  with any of the other 4 permutations of hyperparams (they all returned the same hit rate).
+Hit rate: 99.49%

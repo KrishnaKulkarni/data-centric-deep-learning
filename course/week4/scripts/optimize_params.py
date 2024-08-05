@@ -18,7 +18,6 @@ from rag.vector import retrieve_documents, get_my_collection_name
 
 load_dotenv()
 
-
 class OptimizeRagParams(FlowSpec):
   r"""MetaFlow to optimize a RAG hyperparameters by maximizing a retrieval 
   metric on top of an evaluation set.
@@ -54,23 +53,23 @@ class OptimizeRagParams(FlowSpec):
   def get_search_space(self):
     r"""Define a set of RAG configurations to search over.
     """
-    # Each hyperparameter setting should loo like:
-    #   hparam = DotMap({
-    #     "embedding": "all-MiniLM-L6-v2",
-    #     "text_search_weight": 0.5,
-    #     "hyde_embeddings": False,
-    #   })
+    # ===========================
+    embeddings = ["all-MiniLM-L6-v2", "thenlper/gte-small"]
+    text_search_weights = [0, 0.5]
+    hyde_embeddings = [False, True]
+
     hparams: List[DotMap] = []
-    # ===========================
-    # FILL ME OUT
-    # Define a set of hyperparameters to search over. We want to compare
-    # - two different embedding models: all-MiniLM-L6-v2 vs thenlper/gte-small
-    # - two different text search weights: 0 vs 0.5
-    # - whether to use hyde embeddings or question embeddings
-    # In total this is searching over 8 configurations. In practice, we may search
-    # over 100,000s but this should illustruate the point.
-    # TODO
-    # ===========================
+    for e in embeddings:
+      for tsw in text_search_weights:
+        for he in hyde_embeddings:
+          hparam = DotMap({
+            "embedding": e,
+            "text_search_weight": tsw,
+            "hyde_embeddings": he,
+          })
+
+          hparams.append(hparam)
+
     assert len(hparams) > 0, "Remember to complete the code in `get_search_space`"
     assert len(hparams) == 8, "You should have 8 configurations" 
     self.hparams = hparams
@@ -97,22 +96,31 @@ class OptimizeRagParams(FlowSpec):
     hits = 0
     for i in tqdm(range(len(questions))):
       question = questions.question.iloc[i]
-      gt_id = questions.doc_id.iloc[i]
+      groundtruth_doc_id = questions.doc_id.iloc[i]
       # ===========================
-      # FILL ME OUT
-      # Write code to do the following:
-      #   1. Perform top-3 retrieval using the question using Starpoint. To do this you will 
-      #      need to use SentenceTransformers to compute embedding. Make sure to take into account
-      #      the three hyperparameters in `hparams` to do this.
-      #   2. Track if the correct document appears in the top 3 retrieved documents.
-      #      +1 to `hits` if it does. +0 to `hits` if not.
-      # TODO
-      # ===========================
+      retrieved_docs = retrieve_documents(
+        api_key=self.starpoint_api_key,
+        collection_name=collection_name,
+        query=question,
+        query_embedding= embedding_model.encode(question).tolist(),
+        text_search_weight=self.input.text_search_weight,
+        top_k=3,
+      )
+      hits += self._evaluate_hit(retrieved_docs, groundtruth_doc_id)
 
     hit_rate = hits / float(len(questions))
     self.hit_rate = hit_rate  # save to class
     self.hparam = self.input
     self.next(self.find_best)
+
+  def _evaluate_hit(self, docs, ground_truth_doc_id):
+    hit = 0
+
+    if(any(doc['metadata']['doc_id'] == ground_truth_doc_id for doc in docs)):
+      hit = 1
+
+    return hit
+
 
   @step
   def find_best(self, inputs):
